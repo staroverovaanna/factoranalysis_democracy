@@ -1,1 +1,1 @@
-# factoranalysis_democracy
+# factor_analysis_democracy
