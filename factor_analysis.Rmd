@@ -1,0 +1,242 @@
+---
+title: "factor_analysis"
+output: pdf_document
+---
+
+Here you can learn more about the Data: https://www.worldvaluessurvey.org/WVSDocumentationWV6.jsp
+
+The aim of this work is to highlight specific  interpretation of the democracy in Germany
+A theoretical base of this research is written by Inglehart (ect)
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(foreign)
+library(psych)
+library(GGally)
+library(GPArotation)
+library(nFactors)
+library(lavaan)
+library(semTools)
+library(semPlot)
+```
+
+First, read the data in exel formal:
+
+```{r}
+#install.packages('readxl')
+library(readxl)
+dataHW <- read_xlsx(file.choose())
+```
+PART ONE: pre-processing
+
+Now we choose only whoose columns, which will be used in analysis
+
+```{r}
+dataHW <- subset(dataHW, select = c("V131: Democracy: Governments tax the rich and subsidize the poor.", "V132: Democracy: Religious authorities interpret the laws.", "V133: Democracy: People choose their leaders in free elections.", "V134: Democracy: People receive state aid for unemployment.", "V135: Democracy: The army takes over when government is incompetent.", "V136: Democracy: Civil rights protect people’s liberty against oppression.", "V137: Democracy: The state makes people's incomes equal",  "V138: Democracy: People obey their rulers" ,"V139: Democracy: Women have the same rights as men."))
+data <- na.omit(dataHW)
+summary(data)
+```
+
+
+```{r}
+nrow(data)
+colnames(data) <- c("v131", "v132", "v133", "v134", "v135", "v136", "v137", "v138", "v139")
+describe(data)
+```
+Leavivg out outliers and measurement errors:
+```{r}
+all(0 < data)
+all(data < 11)
+```
+
+```{r}
+data <- data[!(data$v131 < 1 | data$v132 < 1 | data$v133 < 1 | data$v134 < 1 | data$v135 < 1 | data$v136 < 1 | data$v137 < 1 | data$v138 < 1 | data$v139 < 1), ]
+```
+
+PART TWO: exploratory analysis
+Correlation matrix and Kaiser-Meyer statistics
+```{r}
+corr <- cor(data)
+corrplot(corr)
+```
+Now Im using  Kaiser-Meyer statistics to find out if the data is suttable for factor analysis (tests hypothesis that partial correlations between variables are small - acceptable values are more than 0.6) - all variables are suitable
+
+```{r}
+library(psych)
+KMO(data)
+```
+
+Determining the optimal number of interpretable factors by using Very Simple Structure:
+(compared to normal dictribution - ordinate 1)
+
+```{r}
+VSS.scree(corr)
+```
+
+
+```{r}
+efa1 <- fa(r = corr, nfactors = 2, fm = "pa", rotate = "varimax")
+efa1
+print(efa1$loadings, cutoff=0.3)
+
+```
+```{r}
+efa2 <- fa(r = corr, nfactors = 2, fm = "pa", rotate = "oblimin")
+efa2
+
+```
+
+
+```{r}
+cfa000 <- 'hard_power=~ v132 + v135 + v138
+welfare_state =~ v131 + v134 + v137 
+civil_rights =~ v133 + v136 + v139'
+model000 <- cfa(cfa000, data)
+summary(model000, fit.measures = TRUE, standardized = TRUE)
+
+```
+
+```{r}
+cfa1 <- 'radical =~ v132 + v135 + v138
+central =~ v131 + v133 + v134 + v136 + v137 + v139'
+
+```
+
+```{r}
+library(lavaan)
+model1 <- cfa(cfa1, data)
+summary(model1, fit.measures = TRUE, standardized = TRUE)
+
+```
+
+
+```{r}
+mepc <- modindices(model1, sort. = TRUE)
+mepc
+```
+
+```{r}
+cfa2 <- 'radical =~ v132 + v135 + v138
+central =~ v131 + v133 + v134 + v136 + v137 + v139
+v131~~v137'
+
+model2 <- cfa(cfa2, data)
+summary(model2, fit.measures = TRUE, standardized = TRUE)
+
+```
+
+
+```{r}
+anova(model1, model2)
+
+```
+
+```{r}
+mepc2 <- modindices(model2, sort. = TRUE)
+mepc2
+
+```
+
+```{r}
+cfa3 <- 'radical =~ v132 + v135 + v138
+central =~ v131 + v133 + v134 + v136 + v137 + v139
+v131~~v137
+v131~~v134'
+
+
+model3 <- cfa(cfa3, data)
+summary(model3, fit.measures = TRUE, standardized = TRUE)
+
+```
+
+```{r}
+anova(model2, model3)
+```
+
+
+```{r}
+mepc3 <- modindices(model3, sort. = TRUE)
+mepc3
+```
+
+
+```{r}
+cfa4 <- 'radical =~ v132 + v135 + v138
+central =~ v131 + v133 + v134 + v136 + v137 + v139
+v131~~v137
+v131~~v134
+v134~~v137
+v133~~v139
+v133~~v137
+v136~~v137
+v137~~v139'
+
+model4 <- cfa(cfa4, data)
+summary(model4, fit.measures = TRUE, standardized = TRUE)
+
+```
+
+
+```{r}
+data_2 <- read_xlsx(file.choose())
+data_2<- subset(data_2, select = c("V240: Sex", "V131: Democracy: Governments tax the rich and subsidize the poor.", "V132: Democracy: Religious authorities interpret the laws.", "V133: Democracy: People choose their leaders in free elections.", "V134: Democracy: People receive state aid for unemployment.", "V135: Democracy: The army takes over when government is incompetent.", "V136: Democracy: Civil rights protect people’s liberty against oppression.", "V137: Democracy: The state makes people's incomes equal",  "V138: Democracy: People obey their rulers" ,"V139: Democracy: Women have the same rights as men."))
+data_2 <- na.omit(data_2)
+colnames(data_2) <- c("sex", "v131", "v132", "v133", "v134", "v135", "v136", "v137", "v138", "v139")
+summary(data_2)
+
+```
+
+```{r}
+configural <- cfa(cfa4, data_2, group="sex")
+summary(configural, fit.measures = TRUE)
+
+```
+
+
+```{r}
+metric <- cfa(cfa4, data_2, group="sex",group.equal="loadings")
+summary(metric, fit.measures=TRUE)
+
+```
+
+```{r}
+CM <- data.frame(cbind(fitMeasures(configural, c("cfi", "rmsea", "srmr")),
+                       fitMeasures(metric, c("cfi","rmsea", "srmr"))))
+colnames(CM) <- c("Configural", "Metric")
+CM$Diff <- CM[,2] - CM[,1]
+round(CM, digits = 4)
+
+```
+
+
+```{r}
+anova(configural, metric)
+```
+
+
+```{r}
+scalar<- cfa(cfa4, data_2, group="sex", group.equal=c("loadings", "intercepts"))
+summary(scalar, fit.measures=TRUE)
+
+
+anova(metric, scalar)
+
+```
+
+```{r}
+MS <- data.frame(cbind(fitMeasures(metric, c("cfi", "rmsea", "srmr")),
+                       fitMeasures(scalar, c("cfi","rmsea", "srmr"))))
+colnames(MS) <- c("Metric", "Scalar")
+MS$Diff <- MS[,2] - MS[,1]
+round(MS, digits = 3)
+
+```
+
+
+
+Citation:
+
+Inglehart, R., C. Haerpfer, A. Moreno, C. Welzel, K. Kizilova, J. Diez-Medrano, M. Lagos, P. Norris, E. Ponarin & B. Puranen et al. (eds.). 2014. World Values Survey: Round Six - Country-Pooled Datafile Version: https://www.worldvaluessurvey.org/WVSDocumentationWV6.jsp. Madrid: JD Systems Institute.
